@@ -36,17 +36,41 @@ import {
 } from "lucide-react"
 
 const SALES_EXECUTIVES = [
-  "Rahul Sharma",
-  "Priya Patel",
-  "Amit Kumar",
-  "Sneha Gupta",
-  "Vikram Singh",
+  "Akshat Kumar",
+  "Anil Kumar Nayak",
+  "Aninda Ganguly",
+  "Ankita Yadav",
+  "Anshika Lalwani",
+  "Bharti Sahu",
+  "Deepak Vishwakarma",
+  "Ganga Dhritlahare",
+  "Geeta Bhiwagade",
+  "Hitesh Ganware",
+  "Khushi Khemani",
+  "Krishna Jangde",
+  "Kritika Gupta",
+  "Kuleshwar Prasad Yadav",
+  "Prakash Sonwani",
+  "Pranav Vinayakrao Bhogawar",
+  "Priya Swarnkar",
+  "Radhika Chaudhary",
+  "Rani Yadav",
+  "Rishab Ritesh Swain",
+  "Sameer Shankar Bilampalli",
+  "Samiran Rajbongshi",
+  "Sarita Baghel",
+  "Sarita Nand",
+  "Suman Sonwani",
+  "Suraj Kumar",
+  "Suresh Kumar",
+  "Suruchi Singhania",
+  "Yogendra Kumar",
 ]
 
 const VISIT_TYPES = [
-  "New Face to Face Meeting",
-  "Existing Face to Face Meeting",
-  "MDO Face to Face Meeting",
+  "New F2F",
+  "Existing F2F",
+  "MDO F2F",
 ]
 
 const DESIGNATIONS = [
@@ -95,7 +119,6 @@ const ORDER_PROBABILITY = ["Hot", "Warm", "Cold"]
 
 interface ContactEntry {
   designation: string
-  companyName: string
   contactPerson: string
   contactMobile: string
 }
@@ -104,6 +127,7 @@ interface ReportState {
   id: number
   expandedSection: number
   completedSections: number[]
+  companyName: string
   contacts: ContactEntry[]
   hasEnquiry: string
   isCollapsed: boolean
@@ -114,7 +138,8 @@ function createNewReport(id: number): ReportState {
     id,
     expandedSection: 1,
     completedSections: [],
-    contacts: [{ designation: "", companyName: "", contactPerson: "", contactMobile: "" }],
+    companyName: "",
+    contacts: [{ designation: "", contactPerson: "", contactMobile: "" }],
     hasEnquiry: "",
     isCollapsed: false,
   }
@@ -136,37 +161,46 @@ export default function FieldSalesForm() {
   useEffect(() => {
     if (typeof window !== "undefined" && navigator.geolocation) {
       setLocationLoading(true)
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
+
+      const fetchLocationName = async (latitude: number, longitude: number) => {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`
+          )
+          const data = await res.json()
+          const addr = data.address || {}
+          const locationName =
+            addr.city ||
+            addr.town ||
+            addr.village ||
+            addr.suburb ||
+            addr.county ||
+            data.display_name ||
+            `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+          setLiveLocation(locationName)
+        } catch {
+          setLiveLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`)
+        } finally {
+          setLocationLoading(false)
+        }
+      }
+
+      const watchId = navigator.geolocation.watchPosition(
+        (position) => {
           const { latitude, longitude } = position.coords
-          try {
-            const res = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`
-            )
-            const data = await res.json()
-            const addr = data.address || {}
-            const locationName =
-              addr.city ||
-              addr.town ||
-              addr.village ||
-              addr.suburb ||
-              addr.county ||
-              data.display_name ||
-              `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
-            setLiveLocation(locationName)
-          } catch {
-            setLiveLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`)
-          } finally {
-            setLocationLoading(false)
-          }
+          fetchLocationName(latitude, longitude)
         },
-        () => {
-          setLiveLocation("")
+        (error) => {
+          console.error("Geolocation error:", error.message)
+          setLiveLocation("Location unavailable")
           setLocationLoading(false)
         },
-        { enableHighAccuracy: true, timeout: 10000 }
+        { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
       )
+
+      return () => navigator.geolocation.clearWatch(watchId)
     } else {
+      setLiveLocation("Location not supported")
       setLocationLoading(false)
     }
   }, [])
@@ -231,7 +265,7 @@ export default function FieldSalesForm() {
     const report = reports.find((r) => r.id === reportId)
     if (report) {
       updateReport(reportId, {
-        contacts: [...report.contacts, { designation: "", companyName: "", contactPerson: "", contactMobile: "" }],
+        contacts: [...report.contacts, { designation: "", contactPerson: "", contactMobile: "" }],
       })
     }
   }
@@ -368,11 +402,10 @@ export default function FieldSalesForm() {
               onClick={() => toggleReportCollapse(report.id)}
             >
               <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                  report.completedSections.length === 7
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${report.completedSections.length === 7
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground"
-                }`}>
+                  }`}>
                   {report.completedSections.length === 7 ? (
                     <Check className="h-4 w-4" />
                   ) : (
@@ -445,7 +478,7 @@ export default function FieldSalesForm() {
                   {report.expandedSection === 1 && (
                     <CardContent className="space-y-4 pt-0">
                       <div className="space-y-2">
-                        <Label>Sales Executive Name *</Label>
+                        <Label>Sales Person Name *</Label>
                         <Select>
                           <SelectTrigger>
                             <SelectValue placeholder="Select your name" />
@@ -472,11 +505,9 @@ export default function FieldSalesForm() {
                         <Label>City / Location of Visit *</Label>
                         <div className="relative">
                           <Input
-                            value={liveLocation}
-                            onChange={(e) => setLiveLocation(e.target.value)}
-                            placeholder={locationLoading ? "Detecting location..." : "Enter city or location"}
-                            readOnly={locationLoading}
-                            className={locationLoading ? "bg-muted pr-10" : ""}
+                            value={locationLoading ? "Detecting location..." : liveLocation}
+                            readOnly
+                            className="bg-muted pr-10 cursor-not-allowed"
                           />
                           {locationLoading && (
                             <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
@@ -582,6 +613,14 @@ export default function FieldSalesForm() {
                   </CardHeader>
                   {report.expandedSection === 3 && (
                     <CardContent className="space-y-4 pt-0">
+                      <div className="space-y-2">
+                        <Label>Client / Company Name *</Label>
+                        <Input
+                          value={report.companyName}
+                          onChange={(e) => updateReport(report.id, { companyName: e.target.value })}
+                          placeholder="Enter company name"
+                        />
+                      </div>
                       {report.contacts.map((contact, index) => (
                         <div key={index} className="space-y-3 p-3 border border-border rounded-lg relative">
                           {report.contacts.length > 1 && (
@@ -615,14 +654,6 @@ export default function FieldSalesForm() {
                                 ))}
                               </SelectContent>
                             </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Client / Company Name *</Label>
-                            <Input
-                              value={contact.companyName}
-                              onChange={(e) => updateContact(report.id, index, "companyName", e.target.value)}
-                              placeholder="Enter company name"
-                            />
                           </div>
                           <div className="space-y-2">
                             <Label>Contact Person Name *</Label>
@@ -944,93 +975,15 @@ export default function FieldSalesForm() {
                   {report.expandedSection === 7 && (
                     <CardContent className="space-y-4 pt-0">
                       <p className="text-sm text-muted-foreground">
-                        Upload photos of your visit (optional)
+                        Capture a photo of your F2F meeting with the client (optional)
                       </p>
 
-                      {/* Visiting Card */}
                       <div className="space-y-2">
-                        <Label>Visiting Card</Label>
+                        <Label>F2F Meeting Photo with Client</Label>
                         <input
                           type="file"
                           accept="image/*"
-                          className="hidden"
-                          ref={fileInputRefs.visitingCard}
-                          onChange={(e) =>
-                            handleFileUpload("visitingCard", e.target.files?.[0] || null)
-                          }
-                        />
-                        {uploadedFiles.visitingCard ? (
-                          <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                            <span className="text-sm truncate flex-1">
-                              {uploadedFiles.visitingCard.name}
-                            </span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleFileUpload("visitingCard", null)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="w-full"
-                            onClick={() => fileInputRefs.visitingCard.current?.click()}
-                          >
-                            <Camera className="h-4 w-4 mr-2" />
-                            Upload Visiting Card
-                          </Button>
-                        )}
-                      </div>
-
-                      {/* Project Site */}
-                      <div className="space-y-2">
-                        <Label>Project Site</Label>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          ref={fileInputRefs.projectSite}
-                          onChange={(e) =>
-                            handleFileUpload("projectSite", e.target.files?.[0] || null)
-                          }
-                        />
-                        {uploadedFiles.projectSite ? (
-                          <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                            <span className="text-sm truncate flex-1">
-                              {uploadedFiles.projectSite.name}
-                            </span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleFileUpload("projectSite", null)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="w-full"
-                            onClick={() => fileInputRefs.projectSite.current?.click()}
-                          >
-                            <Camera className="h-4 w-4 mr-2" />
-                            Upload Project Site Photo
-                          </Button>
-                        )}
-                      </div>
-
-                      {/* Client Meeting */}
-                      <div className="space-y-2">
-                        <Label>Client Meeting</Label>
-                        <input
-                          type="file"
-                          accept="image/*"
+                          capture="environment"
                           className="hidden"
                           ref={fileInputRefs.clientMeeting}
                           onChange={(e) =>
@@ -1059,7 +1012,7 @@ export default function FieldSalesForm() {
                             onClick={() => fileInputRefs.clientMeeting.current?.click()}
                           >
                             <Camera className="h-4 w-4 mr-2" />
-                            Upload Client Meeting Photo
+                            Take Photo
                           </Button>
                         )}
                       </div>
