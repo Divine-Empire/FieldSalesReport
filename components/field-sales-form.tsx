@@ -33,35 +33,12 @@ import {
 } from "lucide-react"
 
 const SALES_EXECUTIVES = [
-  "Akshat Kumar",
-  "Anil Kumar Nayak",
-  "Aninda Ganguly",
-  "Ankita Yadav",
-  "Anshika Lalwani",
-  "Bharti Sahu",
-  "Deepak Vishwakarma",
-  "Ganga Dhritlahare",
-  "Geeta Bhiwagade",
-  "Hitesh Ganware",
-  "Khushi Khemani",
-  "Krishna Jangde",
-  "Kritika Gupta",
-  "Kuleshwar Prasad Yadav",
-  "Prakash Sonwani",
-  "Pranav Vinayakrao Bhogawar",
-  "Priya Swarnkar",
-  "Radhika Chaudhary",
-  "Rani Yadav",
-  "Rishab Ritesh Swain",
-  "Sameer Shankar Bilampalli",
-  "Samiran Rajbongshi",
-  "Sarita Baghel",
-  "Sarita Nand",
-  "Suman Sonwani",
-  "Suraj Kumar",
-  "Suresh Kumar",
-  "Suruchi Singhania",
-  "Yogendra Kumar",
+  "PRANAV VINAYAKRAO BHOGAWAR",
+  "RANJAN KUMAR PRUSTY",
+  "SAMIRAN RAJBONGSHI",
+  "ROSHAN DEWANGAN",
+  "MANOSH ROY",
+  "AMAN JHA",
 ]
 
 const VISIT_TYPES = [
@@ -95,6 +72,7 @@ const NATURE_OF_PROJECT = [
   "Mines",
   "Rail",
   "Road",
+  "Other",
 ]
 
 const BALANCE_WORK_PERCENTAGES = [
@@ -176,27 +154,38 @@ export default function FieldSalesForm() {
       const fetchLocationName = async (latitude: number, longitude: number) => {
         try {
           const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
           )
+          if (!res.ok) throw new Error("Nominatim failed")
           const data = await res.json()
-          const addr = data.address || {}
-          const locationName =
-            addr.city ||
-            addr.town ||
-            addr.village ||
-            addr.suburb ||
-            addr.county ||
-            data.display_name ||
-            `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
-          setLiveLocation(locationName)
+          if (data.display_name) {
+            setLiveLocation(data.display_name)
+          } else {
+            throw new Error("No display_name")
+          }
         } catch {
-          setLiveLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`)
+          try {
+            const fallbackRes = await fetch(
+              `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
+            )
+            const fallbackData = await fallbackRes.json()
+            const fallbackName = [fallbackData.locality, fallbackData.city, fallbackData.principalSubdivision]
+              .filter(Boolean)
+              .join(", ")
+            if (fallbackName) {
+              setLiveLocation(fallbackName)
+            } else {
+              setLiveLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`)
+            }
+          } catch {
+            setLiveLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`)
+          }
         } finally {
           setLocationLoading(false)
         }
       }
 
-      const watchId = navigator.geolocation.watchPosition(
+      navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords
           fetchLocationName(latitude, longitude)
@@ -208,8 +197,6 @@ export default function FieldSalesForm() {
         },
         { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
       )
-
-      return () => navigator.geolocation.clearWatch(watchId)
     } else {
       setLiveLocation("Location not supported")
       setLocationLoading(false)
@@ -404,7 +391,7 @@ export default function FieldSalesForm() {
           {expandedSection === 1 && (
             <CardContent className="space-y-4 pt-0">
               <div className="space-y-2">
-                <Label>Sales Person Name *</Label>
+                <Label>Sales Person Name</Label>
                 <Select>
                   <SelectTrigger>
                     <SelectValue placeholder="Select your name" />
@@ -419,7 +406,7 @@ export default function FieldSalesForm() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Date and Time of Visit *</Label>
+                <Label>Date and Time of Visit</Label>
                 <Input
                   type="text"
                   value={formatDateTime(currentDateTime)}
@@ -428,7 +415,7 @@ export default function FieldSalesForm() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>City / Location of Visit *</Label>
+                <Label>City / Location of Visit</Label>
                 <div className="relative">
                   <Input
                     value={locationLoading ? "Detecting location..." : liveLocation}
@@ -483,7 +470,7 @@ export default function FieldSalesForm() {
           {expandedSection === 2 && (
             <CardContent className="space-y-4 pt-0">
               <div className="space-y-2">
-                <Label>Type of Visit *</Label>
+                <Label>Type of Visit</Label>
                 <Select>
                   <SelectTrigger>
                     <SelectValue placeholder="Select visit type" />
@@ -540,7 +527,7 @@ export default function FieldSalesForm() {
           {expandedSection === 3 && (
             <CardContent className="space-y-4 pt-0">
               <div className="space-y-2">
-                <Label>Client / Company Name *</Label>
+                <Label>Client / Company Name</Label>
                 <Input
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
@@ -564,7 +551,7 @@ export default function FieldSalesForm() {
                     Contact {index + 1}
                   </p>
                   <div className="space-y-2">
-                    <Label>Designation *</Label>
+                    <Label>Designation</Label>
                     <Select
                       value={contact.designation}
                       onValueChange={(val) => updateContact(index, "designation", val)}
@@ -582,7 +569,7 @@ export default function FieldSalesForm() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Contact Person Name *</Label>
+                    <Label>Contact Person Name</Label>
                     <Input
                       value={contact.contactPerson}
                       onChange={(e) => updateContact(index, "contactPerson", e.target.value)}
@@ -590,7 +577,7 @@ export default function FieldSalesForm() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Contact Person Mobile *</Label>
+                    <Label>Contact Person Mobile</Label>
                     <Input
                       type="tel"
                       value={contact.contactMobile}
@@ -610,7 +597,7 @@ export default function FieldSalesForm() {
                 Add Another Contact
               </Button>
               <div className="space-y-2">
-                <Label>Nature of Business *</Label>
+                <Label>Nature of Business</Label>
                 <Select>
                   <SelectTrigger>
                     <SelectValue placeholder="Select nature of business" />
@@ -788,7 +775,7 @@ export default function FieldSalesForm() {
           {expandedSection === 5 && (
             <CardContent className="space-y-4 pt-0">
               <div className="space-y-3">
-                <Label>Did you receive any enquiry? *</Label>
+                <Label>Did you receive any enquiry?</Label>
                 <RadioGroup
                   value={hasEnquiry}
                   onValueChange={setHasEnquiry}
@@ -811,15 +798,15 @@ export default function FieldSalesForm() {
               {hasEnquiry === "yes" && (
                 <>
                   <div className="space-y-2">
-                    <Label>Product Interested In *</Label>
+                    <Label>Product Interested In</Label>
                     <Input placeholder="Enter product name" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Quantity Required *</Label>
+                    <Label>Quantity Required</Label>
                     <Input placeholder="Enter quantity" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Expected Purchase Time *</Label>
+                    <Label>Expected Purchase Time</Label>
                     <Select>
                       <SelectTrigger>
                         <SelectValue placeholder="Select expected time" />
@@ -878,7 +865,7 @@ export default function FieldSalesForm() {
           {expandedSection === 6 && (
             <CardContent className="space-y-4 pt-0">
               <div className="space-y-2">
-                <Label>Order Probability *</Label>
+                <Label>Order Probability</Label>
                 <Select>
                   <SelectTrigger>
                     <SelectValue placeholder="Select probability" />
@@ -1002,7 +989,7 @@ export default function FieldSalesForm() {
           <Button
             type="submit"
             className="w-full h-12 text-base"
-            disabled={isSubmitting}
+            disabled={isSubmitting || [1, 2, 3, 4, 5, 6].some((id) => !completedSections.includes(id))}
           >
             {isSubmitting ? (
               <span className="flex items-center gap-2">
