@@ -21,10 +21,7 @@ import {
   HardHat,
   ClipboardList,
   Target,
-  Users,
-  ArrowRight,
   Camera,
-  MessageSquare,
   Check,
   Loader2,
   ChevronDown,
@@ -123,25 +120,39 @@ interface ContactEntry {
   contactMobile: string
 }
 
-interface ReportState {
+interface ProjectEntry {
   id: number
-  expandedSection: number
-  completedSections: number[]
-  companyName: string
-  contacts: ContactEntry[]
-  hasEnquiry: string
-  isCollapsed: boolean
+  projectName: string
+  projectLocation: string
+  natureOfProject: string
+  balanceWork: string
+  remarks: string
 }
 
-function createNewReport(id: number): ReportState {
+interface FormSection {
+  id: number
+  title: string
+  icon: React.ReactNode
+}
+
+const SECTIONS: FormSection[] = [
+  { id: 1, title: "Sales Executive Details", icon: <User className="h-5 w-5" /> },
+  { id: 2, title: "Visit Type", icon: <MapPin className="h-5 w-5" /> },
+  { id: 3, title: "Client / Company Details", icon: <Building2 className="h-5 w-5" /> },
+  { id: 4, title: "Project Information", icon: <HardHat className="h-5 w-5" /> },
+  { id: 5, title: "Enquiry Details", icon: <ClipboardList className="h-5 w-5" /> },
+  { id: 6, title: "Order Probability", icon: <Target className="h-5 w-5" /> },
+  { id: 7, title: "Photo Upload", icon: <Camera className="h-5 w-5" /> },
+]
+
+function createNewProject(id: number): ProjectEntry {
   return {
     id,
-    expandedSection: 1,
-    completedSections: [],
-    companyName: "",
-    contacts: [{ designation: "", contactPerson: "", contactMobile: "" }],
-    hasEnquiry: "",
-    isCollapsed: false,
+    projectName: "",
+    projectLocation: "",
+    natureOfProject: "",
+    balanceWork: "",
+    remarks: "",
   }
 }
 
@@ -217,100 +228,70 @@ export default function FieldSalesForm() {
     return `${DD}/${MM}/${YYYY} ${hh}:${mm}:${ss}`
   }
 
-  const [reports, setReports] = useState<ReportState[]>([createNewReport(1)])
+  // Form state
+  const [expandedSection, setExpandedSection] = useState<number>(1)
+  const [completedSections, setCompletedSections] = useState<number[]>([])
+  const [companyName, setCompanyName] = useState("")
+  const [contacts, setContacts] = useState<ContactEntry[]>([
+    { designation: "", contactPerson: "", contactMobile: "" },
+  ])
+  const [projects, setProjects] = useState<ProjectEntry[]>([createNewProject(1)])
+  const [hasEnquiry, setHasEnquiry] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
 
   const fileInputRefs = {
-    visitingCard: useRef<HTMLInputElement>(null),
-    projectSite: useRef<HTMLInputElement>(null),
     clientMeeting: useRef<HTMLInputElement>(null),
   }
 
-  const [uploadedFiles, setUploadedFiles] = useState<{ [key: string]: File | null }>({
-    visitingCard: null,
-    projectSite: null,
-    clientMeeting: null,
-  })
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
 
-  const updateReport = (reportId: number, updates: Partial<ReportState>) => {
-    setReports((prev) =>
-      prev.map((r) => (r.id === reportId ? { ...r, ...updates } : r))
+  const toggleSection = (sectionId: number) => {
+    setExpandedSection(expandedSection === sectionId ? 0 : sectionId)
+  }
+
+  const markSectionComplete = (sectionId: number) => {
+    if (!completedSections.includes(sectionId)) {
+      setCompletedSections([...completedSections, sectionId])
+    }
+    if (sectionId < 7) {
+      setExpandedSection(sectionId + 1)
+    }
+  }
+
+  // Contact functions
+  const addContact = () => {
+    setContacts([...contacts, { designation: "", contactPerson: "", contactMobile: "" }])
+  }
+
+  const removeContact = (index: number) => {
+    if (contacts.length > 1) {
+      setContacts(contacts.filter((_, i) => i !== index))
+    }
+  }
+
+  const updateContact = (index: number, field: keyof ContactEntry, value: string) => {
+    const updated = [...contacts]
+    updated[index] = { ...updated[index], [field]: value }
+    setContacts(updated)
+  }
+
+  // Project functions
+  const addProject = () => {
+    const newId = projects.length > 0 ? Math.max(...projects.map((p) => p.id)) + 1 : 1
+    setProjects([...projects, createNewProject(newId)])
+  }
+
+  const removeProject = (id: number) => {
+    if (projects.length > 1) {
+      setProjects(projects.filter((p) => p.id !== id))
+    }
+  }
+
+  const updateProject = (id: number, field: keyof ProjectEntry, value: string) => {
+    setProjects(
+      projects.map((p) => (p.id === id ? { ...p, [field]: value } : p))
     )
-  }
-
-  const toggleSection = (reportId: number, sectionId: number) => {
-    const report = reports.find((r) => r.id === reportId)
-    if (report) {
-      updateReport(reportId, {
-        expandedSection: report.expandedSection === sectionId ? 0 : sectionId,
-      })
-    }
-  }
-
-  const markSectionComplete = (reportId: number, sectionId: number) => {
-    const report = reports.find((r) => r.id === reportId)
-    if (report) {
-      const newCompleted = report.completedSections.includes(sectionId)
-        ? report.completedSections
-        : [...report.completedSections, sectionId]
-      updateReport(reportId, {
-        completedSections: newCompleted,
-        expandedSection: sectionId < 7 ? sectionId + 1 : report.expandedSection,
-      })
-    }
-  }
-
-  const addContact = (reportId: number) => {
-    const report = reports.find((r) => r.id === reportId)
-    if (report) {
-      updateReport(reportId, {
-        contacts: [...report.contacts, { designation: "", contactPerson: "", contactMobile: "" }],
-      })
-    }
-  }
-
-  const removeContact = (reportId: number, index: number) => {
-    const report = reports.find((r) => r.id === reportId)
-    if (report && report.contacts.length > 1) {
-      updateReport(reportId, {
-        contacts: report.contacts.filter((_, i) => i !== index),
-      })
-    }
-  }
-
-  const updateContact = (reportId: number, index: number, field: keyof ContactEntry, value: string) => {
-    const report = reports.find((r) => r.id === reportId)
-    if (report) {
-      const updated = [...report.contacts]
-      updated[index] = { ...updated[index], [field]: value }
-      updateReport(reportId, { contacts: updated })
-    }
-  }
-
-  const handleFileUpload = (type: keyof typeof uploadedFiles, file: File | null) => {
-    setUploadedFiles((prev) => ({ ...prev, [type]: file }))
-  }
-
-  const addNewReport = () => {
-    const lastReport = reports[reports.length - 1]
-    // Collapse the last report
-    updateReport(lastReport.id, { isCollapsed: true, expandedSection: 0 })
-    const newId = lastReport.id + 1
-    setReports((prev) => [...prev, createNewReport(newId)])
-  }
-
-  const toggleReportCollapse = (reportId: number) => {
-    const report = reports.find((r) => r.id === reportId)
-    if (report) {
-      updateReport(reportId, { isCollapsed: !report.isCollapsed })
-    }
-  }
-
-  const deleteReport = (reportId: number) => {
-    if (reports.length > 1) {
-      setReports((prev) => prev.filter((r) => r.id !== reportId))
-    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -320,10 +301,6 @@ export default function FieldSalesForm() {
     setIsSubmitting(false)
     setIsSubmitted(true)
   }
-
-  // Calculate total progress
-  const totalSections = reports.length * 7
-  const totalCompleted = reports.reduce((sum, r) => sum + r.completedSections.length, 0)
 
   if (isSubmitted) {
     return (
@@ -337,17 +314,18 @@ export default function FieldSalesForm() {
               Report Submitted!
             </h2>
             <p className="text-muted-foreground mb-6">
-              {reports.length} field visit report{reports.length > 1 ? "s" : ""} successfully recorded.
+              Your field visit report has been successfully recorded.
             </p>
             <Button
               onClick={() => {
                 setIsSubmitted(false)
-                setReports([createNewReport(1)])
-                setUploadedFiles({
-                  visitingCard: null,
-                  projectSite: null,
-                  clientMeeting: null,
-                })
+                setCompletedSections([])
+                setExpandedSection(1)
+                setCompanyName("")
+                setContacts([{ designation: "", contactPerson: "", contactMobile: "" }])
+                setProjects([createNewProject(1)])
+                setHasEnquiry("")
+                setUploadedFile(null)
               }}
               className="w-full"
             >
@@ -380,667 +358,643 @@ export default function FieldSalesForm() {
       <div className="bg-card border-b border-border">
         <div className="max-w-2xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
-            <span>{reports.length} Report{reports.length > 1 ? "s" : ""} — {totalCompleted} of {totalSections} sections completed</span>
-            <span>{Math.round((totalCompleted / totalSections) * 100)}%</span>
+            <span>{completedSections.length} of 7 sections completed</span>
+            <span>{Math.round((completedSections.length / 7) * 100)}%</span>
           </div>
           <div className="h-2 bg-muted rounded-full overflow-hidden">
             <div
               className="h-full bg-primary transition-all duration-300 rounded-full"
-              style={{ width: `${(totalCompleted / totalSections) * 100}%` }}
+              style={{ width: `${(completedSections.length / 7) * 100}%` }}
             />
           </div>
         </div>
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {reports.map((report, reportIndex) => (
-          <div key={report.id} className="space-y-3">
-            {/* Report Header */}
-            <div
-              className="flex items-center justify-between bg-card border border-border rounded-lg px-4 py-3 cursor-pointer"
-              onClick={() => toggleReportCollapse(report.id)}
-            >
+      <form onSubmit={handleSubmit} className="max-w-2xl mx-auto px-4 py-6 space-y-3">
+        {/* Section 1: Sales Executive Details */}
+        <Card className={`transition-all ${expandedSection === 1 ? "ring-2 ring-primary/20" : ""}`}>
+          <CardHeader
+            className="cursor-pointer select-none"
+            onClick={() => toggleSection(1)}
+          >
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${report.completedSections.length === 7
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center ${completedSections.includes(1)
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground"
-                  }`}>
-                  {report.completedSections.length === 7 ? (
+                    }`}
+                >
+                  {completedSections.includes(1) ? (
                     <Check className="h-4 w-4" />
                   ) : (
-                    <span className="text-sm font-semibold">{reportIndex + 1}</span>
+                    <User className="h-4 w-4" />
                   )}
                 </div>
-                <div>
-                  <p className="font-semibold text-foreground">
-                    Field Sales Report #{reportIndex + 1}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {report.completedSections.length}/7 sections completed
-                  </p>
+                <CardTitle className="text-base">Section 1: Sales Executive Details</CardTitle>
+              </div>
+              {expandedSection === 1 ? (
+                <ChevronUp className="h-5 w-5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+              )}
+            </div>
+          </CardHeader>
+          {expandedSection === 1 && (
+            <CardContent className="space-y-4 pt-0">
+              <div className="space-y-2">
+                <Label>Sales Person Name *</Label>
+                <Select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select your name" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SALES_EXECUTIVES.map((name) => (
+                      <SelectItem key={name} value={name}>
+                        {name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Date and Time of Visit *</Label>
+                <Input
+                  type="text"
+                  value={formatDateTime(currentDateTime)}
+                  readOnly
+                  className="bg-muted font-mono"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>City / Location of Visit *</Label>
+                <div className="relative">
+                  <Input
+                    value={locationLoading ? "Detecting location..." : liveLocation}
+                    readOnly
+                    className="bg-muted pr-10 cursor-not-allowed"
+                  />
+                  {locationLoading && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {reports.length > 1 && (
+              <Button
+                type="button"
+                onClick={() => markSectionComplete(1)}
+                className="w-full"
+              >
+                Continue
+              </Button>
+            </CardContent>
+          )}
+        </Card>
+
+        {/* Section 2: Visit Type */}
+        <Card className={`transition-all ${expandedSection === 2 ? "ring-2 ring-primary/20" : ""}`}>
+          <CardHeader
+            className="cursor-pointer select-none"
+            onClick={() => toggleSection(2)}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center ${completedSections.includes(2)
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                    }`}
+                >
+                  {completedSections.includes(2) ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <MapPin className="h-4 w-4" />
+                  )}
+                </div>
+                <CardTitle className="text-base">Section 2: Visit Type</CardTitle>
+              </div>
+              {expandedSection === 2 ? (
+                <ChevronUp className="h-5 w-5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+              )}
+            </div>
+          </CardHeader>
+          {expandedSection === 2 && (
+            <CardContent className="space-y-4 pt-0">
+              <div className="space-y-2">
+                <Label>Type of Visit *</Label>
+                <Select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select visit type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VISIT_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                type="button"
+                onClick={() => markSectionComplete(2)}
+                className="w-full"
+              >
+                Continue
+              </Button>
+            </CardContent>
+          )}
+        </Card>
+
+        {/* Section 3: Client / Company Details */}
+        <Card className={`transition-all ${expandedSection === 3 ? "ring-2 ring-primary/20" : ""}`}>
+          <CardHeader
+            className="cursor-pointer select-none"
+            onClick={() => toggleSection(3)}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center ${completedSections.includes(3)
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                    }`}
+                >
+                  {completedSections.includes(3) ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <Building2 className="h-4 w-4" />
+                  )}
+                </div>
+                <CardTitle className="text-base">Section 3: Client / Company Details</CardTitle>
+              </div>
+              {expandedSection === 3 ? (
+                <ChevronUp className="h-5 w-5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+              )}
+            </div>
+          </CardHeader>
+          {expandedSection === 3 && (
+            <CardContent className="space-y-4 pt-0">
+              <div className="space-y-2">
+                <Label>Client / Company Name *</Label>
+                <Input
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Enter company name"
+                />
+              </div>
+              {contacts.map((contact, index) => (
+                <div key={index} className="space-y-3 p-3 border border-border rounded-lg relative">
+                  {contacts.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute top-2 right-2 h-7 w-7 p-0"
+                      onClick={() => removeContact(index)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Contact {index + 1}
+                  </p>
+                  <div className="space-y-2">
+                    <Label>Designation *</Label>
+                    <Select
+                      value={contact.designation}
+                      onValueChange={(val) => updateContact(index, "designation", val)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select designation" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DESIGNATIONS.map((d) => (
+                          <SelectItem key={d} value={d}>
+                            {d}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Contact Person Name *</Label>
+                    <Input
+                      value={contact.contactPerson}
+                      onChange={(e) => updateContact(index, "contactPerson", e.target.value)}
+                      placeholder="Enter contact person name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Contact Person Mobile *</Label>
+                    <Input
+                      type="tel"
+                      value={contact.contactMobile}
+                      onChange={(e) => updateContact(index, "contactMobile", e.target.value)}
+                      placeholder="Enter mobile number"
+                    />
+                  </div>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addContact}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Another Contact
+              </Button>
+              <div className="space-y-2">
+                <Label>Nature of Business *</Label>
+                <Select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select nature of business" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {NATURE_OF_BUSINESS.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                type="button"
+                onClick={() => markSectionComplete(3)}
+                className="w-full"
+              >
+                Continue
+              </Button>
+            </CardContent>
+          )}
+        </Card>
+
+        {/* Section 4: Project Information (Repeatable) */}
+        <Card className={`transition-all ${expandedSection === 4 ? "ring-2 ring-primary/20" : ""}`}>
+          <CardHeader
+            className="cursor-pointer select-none"
+            onClick={() => toggleSection(4)}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center ${completedSections.includes(4)
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                    }`}
+                >
+                  {completedSections.includes(4) ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <HardHat className="h-4 w-4" />
+                  )}
+                </div>
+                <CardTitle className="text-base">Section 4: Project Information</CardTitle>
+              </div>
+              {expandedSection === 4 ? (
+                <ChevronUp className="h-5 w-5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+              )}
+            </div>
+          </CardHeader>
+          {expandedSection === 4 && (
+            <CardContent className="space-y-4 pt-0">
+              {projects.map((project, index) => (
+                <div key={project.id} className="space-y-3 p-3 border border-border rounded-lg relative">
+                  {projects.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute top-2 right-2 h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => removeProject(project.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Project {index + 1}
+                  </p>
+                  <div className="space-y-2">
+                    <Label>Project Name</Label>
+                    <Input
+                      value={project.projectName}
+                      onChange={(e) => updateProject(project.id, "projectName", e.target.value)}
+                      placeholder="Enter project name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Project Location</Label>
+                    <Input
+                      value={project.projectLocation}
+                      onChange={(e) => updateProject(project.id, "projectLocation", e.target.value)}
+                      placeholder="Enter project location"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Nature of Project</Label>
+                    <Select
+                      value={project.natureOfProject}
+                      onValueChange={(val) => updateProject(project.id, "natureOfProject", val)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select nature of project" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {NATURE_OF_PROJECT.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Percentage% of Balance Work</Label>
+                    <Select
+                      value={project.balanceWork}
+                      onValueChange={(val) => updateProject(project.id, "balanceWork", val)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select balance work %" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {BALANCE_WORK_PERCENTAGES.map((pct) => (
+                          <SelectItem key={pct} value={pct}>
+                            {pct}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Remarks</Label>
+                    <Textarea
+                      value={project.remarks}
+                      onChange={(e) => updateProject(project.id, "remarks", e.target.value)}
+                      placeholder="Enter remarks about the project..."
+                      className="min-h-[80px]"
+                    />
+                  </div>
+                </div>
+              ))}
+              <Button
+                type="button"
+                onClick={() => markSectionComplete(4)}
+                className="w-full"
+              >
+                Save
+              </Button>
+            </CardContent>
+          )}
+        </Card>
+
+        {/* Section 5: Enquiry Details */}
+        <Card className={`transition-all ${expandedSection === 5 ? "ring-2 ring-primary/20" : ""}`}>
+          <CardHeader
+            className="cursor-pointer select-none"
+            onClick={() => toggleSection(5)}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center ${completedSections.includes(5)
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                    }`}
+                >
+                  {completedSections.includes(5) ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <ClipboardList className="h-4 w-4" />
+                  )}
+                </div>
+                <CardTitle className="text-base">Section 5: Enquiry Details</CardTitle>
+              </div>
+              {expandedSection === 5 ? (
+                <ChevronUp className="h-5 w-5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+              )}
+            </div>
+          </CardHeader>
+          {expandedSection === 5 && (
+            <CardContent className="space-y-4 pt-0">
+              <div className="space-y-3">
+                <Label>Did you receive any enquiry? *</Label>
+                <RadioGroup
+                  value={hasEnquiry}
+                  onValueChange={setHasEnquiry}
+                  className="flex gap-6"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="yes" id="enquiry-yes" />
+                    <Label htmlFor="enquiry-yes" className="font-normal cursor-pointer">
+                      Yes
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="no" id="enquiry-no" />
+                    <Label htmlFor="enquiry-no" className="font-normal cursor-pointer">
+                      No
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              {hasEnquiry === "yes" && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Product Interested In *</Label>
+                    <Input placeholder="Enter product name" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Quantity Required *</Label>
+                    <Input placeholder="Enter quantity" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Expected Purchase Time *</Label>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select expected time" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PURCHASE_TIMES.map((time) => (
+                          <SelectItem key={time} value={time}>
+                            {time}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
+              <Button
+                type="button"
+                onClick={() => markSectionComplete(5)}
+                className="w-full"
+              >
+                Continue
+              </Button>
+            </CardContent>
+          )}
+        </Card>
+
+        {/* Section 6: Order Probability */}
+        <Card className={`transition-all ${expandedSection === 6 ? "ring-2 ring-primary/20" : ""}`}>
+          <CardHeader
+            className="cursor-pointer select-none"
+            onClick={() => toggleSection(6)}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center ${completedSections.includes(6)
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                    }`}
+                >
+                  {completedSections.includes(6) ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <Target className="h-4 w-4" />
+                  )}
+                </div>
+                <CardTitle className="text-base">Section 6: Order Probability</CardTitle>
+              </div>
+              {expandedSection === 6 ? (
+                <ChevronUp className="h-5 w-5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+              )}
+            </div>
+          </CardHeader>
+          {expandedSection === 6 && (
+            <CardContent className="space-y-4 pt-0">
+              <div className="space-y-2">
+                <Label>Order Probability *</Label>
+                <Select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select probability" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ORDER_PROBABILITY.map((prob) => (
+                      <SelectItem key={prob} value={prob}>
+                        {prob}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                type="button"
+                onClick={() => markSectionComplete(6)}
+                className="w-full"
+              >
+                Continue
+              </Button>
+            </CardContent>
+          )}
+        </Card>
+
+        {/* Section 7: Photo Upload */}
+        <Card className={`transition-all ${expandedSection === 7 ? "ring-2 ring-primary/20" : ""}`}>
+          <CardHeader
+            className="cursor-pointer select-none"
+            onClick={() => toggleSection(7)}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center ${completedSections.includes(7)
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                    }`}
+                >
+                  {completedSections.includes(7) ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <Camera className="h-4 w-4" />
+                  )}
+                </div>
+                <CardTitle className="text-base">Section 7: Photo Upload</CardTitle>
+              </div>
+              {expandedSection === 7 ? (
+                <ChevronUp className="h-5 w-5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+              )}
+            </div>
+          </CardHeader>
+          {expandedSection === 7 && (
+            <CardContent className="space-y-4 pt-0">
+              <p className="text-sm text-muted-foreground">
+                Capture a photo of your F2F meeting with the client (optional)
+              </p>
+
+              <div className="space-y-2">
+                <Label>F2F Meeting Photo with Client</Label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  ref={fileInputRefs.clientMeeting}
+                  onChange={(e) => setUploadedFile(e.target.files?.[0] || null)}
+                />
+                {uploadedFile ? (
+                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                    <span className="text-sm truncate flex-1">
+                      {uploadedFile.name}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setUploadedFile(null)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
                   <Button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      deleteReport(report.id)
-                    }}
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => fileInputRefs.clientMeeting.current?.click()}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Camera className="h-4 w-4 mr-2" />
+                    Take Photo
                   </Button>
                 )}
-                {report.isCollapsed ? (
-                  <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                ) : (
-                  <ChevronUp className="h-5 w-5 text-muted-foreground" />
-                )}
               </div>
-            </div>
 
-            {!report.isCollapsed && (
-              <>
-                {/* Section 1: Sales Executive Details */}
-                <Card className={`transition-all ${report.expandedSection === 1 ? "ring-2 ring-primary/20" : ""}`}>
-                  <CardHeader
-                    className="cursor-pointer select-none"
-                    onClick={() => toggleSection(report.id, 1)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center ${report.completedSections.includes(1)
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground"
-                            }`}
-                        >
-                          {report.completedSections.includes(1) ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <User className="h-4 w-4" />
-                          )}
-                        </div>
-                        <CardTitle className="text-base">Section 1: Sales Executive Details</CardTitle>
-                      </div>
-                      {report.expandedSection === 1 ? (
-                        <ChevronUp className="h-5 w-5 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                      )}
-                    </div>
-                  </CardHeader>
-                  {report.expandedSection === 1 && (
-                    <CardContent className="space-y-4 pt-0">
-                      <div className="space-y-2">
-                        <Label>Sales Person Name *</Label>
-                        <Select>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select your name" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {SALES_EXECUTIVES.map((name) => (
-                              <SelectItem key={name} value={name}>
-                                {name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Date and Time of Visit *</Label>
-                        <Input
-                          type="text"
-                          value={formatDateTime(currentDateTime)}
-                          readOnly
-                          className="bg-muted font-mono"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>City / Location of Visit *</Label>
-                        <div className="relative">
-                          <Input
-                            value={locationLoading ? "Detecting location..." : liveLocation}
-                            readOnly
-                            className="bg-muted pr-10 cursor-not-allowed"
-                          />
-                          {locationLoading && (
-                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-                          )}
-                        </div>
-                      </div>
-                      <Button
-                        type="button"
-                        onClick={() => markSectionComplete(report.id, 1)}
-                        className="w-full"
-                      >
-                        Continue
-                      </Button>
-                    </CardContent>
-                  )}
-                </Card>
+              <Button
+                type="button"
+                onClick={() => markSectionComplete(7)}
+                className="w-full"
+              >
+                Continue
+              </Button>
+            </CardContent>
+          )}
+        </Card>
 
-                {/* Section 2: Visit Type */}
-                <Card className={`transition-all ${report.expandedSection === 2 ? "ring-2 ring-primary/20" : ""}`}>
-                  <CardHeader
-                    className="cursor-pointer select-none"
-                    onClick={() => toggleSection(report.id, 2)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center ${report.completedSections.includes(2)
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground"
-                            }`}
-                        >
-                          {report.completedSections.includes(2) ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <MapPin className="h-4 w-4" />
-                          )}
-                        </div>
-                        <CardTitle className="text-base">Section 2: Visit Type</CardTitle>
-                      </div>
-                      {report.expandedSection === 2 ? (
-                        <ChevronUp className="h-5 w-5 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                      )}
-                    </div>
-                  </CardHeader>
-                  {report.expandedSection === 2 && (
-                    <CardContent className="space-y-4 pt-0">
-                      <div className="space-y-2">
-                        <Label>Type of Visit *</Label>
-                        <Select>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select visit type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {VISIT_TYPES.map((type) => (
-                              <SelectItem key={type} value={type}>
-                                {type}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Button
-                        type="button"
-                        onClick={() => markSectionComplete(report.id, 2)}
-                        className="w-full"
-                      >
-                        Continue
-                      </Button>
-                    </CardContent>
-                  )}
-                </Card>
-
-                {/* Section 3: Client / Company Details */}
-                <Card className={`transition-all ${report.expandedSection === 3 ? "ring-2 ring-primary/20" : ""}`}>
-                  <CardHeader
-                    className="cursor-pointer select-none"
-                    onClick={() => toggleSection(report.id, 3)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center ${report.completedSections.includes(3)
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground"
-                            }`}
-                        >
-                          {report.completedSections.includes(3) ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <Building2 className="h-4 w-4" />
-                          )}
-                        </div>
-                        <CardTitle className="text-base">Section 3: Client / Company Details</CardTitle>
-                      </div>
-                      {report.expandedSection === 3 ? (
-                        <ChevronUp className="h-5 w-5 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                      )}
-                    </div>
-                  </CardHeader>
-                  {report.expandedSection === 3 && (
-                    <CardContent className="space-y-4 pt-0">
-                      <div className="space-y-2">
-                        <Label>Client / Company Name *</Label>
-                        <Input
-                          value={report.companyName}
-                          onChange={(e) => updateReport(report.id, { companyName: e.target.value })}
-                          placeholder="Enter company name"
-                        />
-                      </div>
-                      {report.contacts.map((contact, index) => (
-                        <div key={index} className="space-y-3 p-3 border border-border rounded-lg relative">
-                          {report.contacts.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="absolute top-2 right-2 h-7 w-7 p-0"
-                              onClick={() => removeContact(report.id, index)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          )}
-                          <p className="text-sm font-medium text-muted-foreground">
-                            Contact {index + 1}
-                          </p>
-                          <div className="space-y-2">
-                            <Label>Designation *</Label>
-                            <Select
-                              value={contact.designation}
-                              onValueChange={(val) => updateContact(report.id, index, "designation", val)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select designation" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {DESIGNATIONS.map((d) => (
-                                  <SelectItem key={d} value={d}>
-                                    {d}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Contact Person Name *</Label>
-                            <Input
-                              value={contact.contactPerson}
-                              onChange={(e) => updateContact(report.id, index, "contactPerson", e.target.value)}
-                              placeholder="Enter contact person name"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Contact Person Mobile *</Label>
-                            <Input
-                              type="tel"
-                              value={contact.contactMobile}
-                              onChange={(e) => updateContact(report.id, index, "contactMobile", e.target.value)}
-                              placeholder="Enter mobile number"
-                            />
-                          </div>
-                        </div>
-                      ))}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => addContact(report.id)}
-                        className="w-full"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Another Contact
-                      </Button>
-                      <div className="space-y-2">
-                        <Label>Nature of Business *</Label>
-                        <Select>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select nature of business" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {NATURE_OF_BUSINESS.map((type) => (
-                              <SelectItem key={type} value={type}>
-                                {type}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Button
-                        type="button"
-                        onClick={() => markSectionComplete(report.id, 3)}
-                        className="w-full"
-                      >
-                        Continue
-                      </Button>
-                    </CardContent>
-                  )}
-                </Card>
-
-                {/* Section 4: Project Information */}
-                <Card className={`transition-all ${report.expandedSection === 4 ? "ring-2 ring-primary/20" : ""}`}>
-                  <CardHeader
-                    className="cursor-pointer select-none"
-                    onClick={() => toggleSection(report.id, 4)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center ${report.completedSections.includes(4)
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground"
-                            }`}
-                        >
-                          {report.completedSections.includes(4) ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <HardHat className="h-4 w-4" />
-                          )}
-                        </div>
-                        <CardTitle className="text-base">Section 4: Project Information</CardTitle>
-                      </div>
-                      {report.expandedSection === 4 ? (
-                        <ChevronUp className="h-5 w-5 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                      )}
-                    </div>
-                  </CardHeader>
-                  {report.expandedSection === 4 && (
-                    <CardContent className="space-y-4 pt-0">
-                      <div className="space-y-2">
-                        <Label>Project Name</Label>
-                        <Input placeholder="Enter project name" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Project Location</Label>
-                        <Input placeholder="Enter project location" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Nature of Project</Label>
-                        <Select>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select nature of project" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {NATURE_OF_PROJECT.map((type) => (
-                              <SelectItem key={type} value={type}>
-                                {type}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Percentage% of Balance Work</Label>
-                        <Select>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select balance work %" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {BALANCE_WORK_PERCENTAGES.map((pct) => (
-                              <SelectItem key={pct} value={pct}>
-                                {pct}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Remarks</Label>
-                        <Textarea
-                          placeholder="Enter remarks about the project..."
-                          className="min-h-[80px]"
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        onClick={() => markSectionComplete(report.id, 4)}
-                        className="w-full"
-                      >
-                        Save
-                      </Button>
-                    </CardContent>
-                  )}
-                </Card>
-
-                {/* Section 5: Enquiry Details */}
-                <Card className={`transition-all ${report.expandedSection === 5 ? "ring-2 ring-primary/20" : ""}`}>
-                  <CardHeader
-                    className="cursor-pointer select-none"
-                    onClick={() => toggleSection(report.id, 5)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center ${report.completedSections.includes(5)
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground"
-                            }`}
-                        >
-                          {report.completedSections.includes(5) ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <ClipboardList className="h-4 w-4" />
-                          )}
-                        </div>
-                        <CardTitle className="text-base">Section 5: Enquiry Details</CardTitle>
-                      </div>
-                      {report.expandedSection === 5 ? (
-                        <ChevronUp className="h-5 w-5 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                      )}
-                    </div>
-                  </CardHeader>
-                  {report.expandedSection === 5 && (
-                    <CardContent className="space-y-4 pt-0">
-                      <div className="space-y-3">
-                        <Label>Did you receive any enquiry? *</Label>
-                        <RadioGroup
-                          value={report.hasEnquiry}
-                          onValueChange={(val) => updateReport(report.id, { hasEnquiry: val })}
-                          className="flex gap-6"
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="yes" id={`enquiry-yes-${report.id}`} />
-                            <Label htmlFor={`enquiry-yes-${report.id}`} className="font-normal cursor-pointer">
-                              Yes
-                            </Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="no" id={`enquiry-no-${report.id}`} />
-                            <Label htmlFor={`enquiry-no-${report.id}`} className="font-normal cursor-pointer">
-                              No
-                            </Label>
-                          </div>
-                        </RadioGroup>
-                      </div>
-                      {report.hasEnquiry === "yes" && (
-                        <>
-                          <div className="space-y-2">
-                            <Label>Product Interested In *</Label>
-                            <Input placeholder="Enter product name" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Quantity Required *</Label>
-                            <Input placeholder="Enter quantity" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Expected Purchase Time *</Label>
-                            <Select>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select expected time" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {PURCHASE_TIMES.map((time) => (
-                                  <SelectItem key={time} value={time}>
-                                    {time}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </>
-                      )}
-                      <Button
-                        type="button"
-                        onClick={() => markSectionComplete(report.id, 5)}
-                        className="w-full"
-                      >
-                        Continue
-                      </Button>
-                    </CardContent>
-                  )}
-                </Card>
-
-                {/* Section 6: Order Probability */}
-                <Card className={`transition-all ${report.expandedSection === 6 ? "ring-2 ring-primary/20" : ""}`}>
-                  <CardHeader
-                    className="cursor-pointer select-none"
-                    onClick={() => toggleSection(report.id, 6)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center ${report.completedSections.includes(6)
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground"
-                            }`}
-                        >
-                          {report.completedSections.includes(6) ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <Target className="h-4 w-4" />
-                          )}
-                        </div>
-                        <CardTitle className="text-base">Section 6: Order Probability</CardTitle>
-                      </div>
-                      {report.expandedSection === 6 ? (
-                        <ChevronUp className="h-5 w-5 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                      )}
-                    </div>
-                  </CardHeader>
-                  {report.expandedSection === 6 && (
-                    <CardContent className="space-y-4 pt-0">
-                      <div className="space-y-2">
-                        <Label>Order Probability *</Label>
-                        <Select>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select probability" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ORDER_PROBABILITY.map((prob) => (
-                              <SelectItem key={prob} value={prob}>
-                                {prob}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Button
-                        type="button"
-                        onClick={() => markSectionComplete(report.id, 6)}
-                        className="w-full"
-                      >
-                        Continue
-                      </Button>
-                    </CardContent>
-                  )}
-                </Card>
-
-                {/* Section 7: Photo Upload */}
-                <Card className={`transition-all ${report.expandedSection === 7 ? "ring-2 ring-primary/20" : ""}`}>
-                  <CardHeader
-                    className="cursor-pointer select-none"
-                    onClick={() => toggleSection(report.id, 7)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center ${report.completedSections.includes(7)
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground"
-                            }`}
-                        >
-                          {report.completedSections.includes(7) ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <Camera className="h-4 w-4" />
-                          )}
-                        </div>
-                        <CardTitle className="text-base">Section 7: Photo Upload</CardTitle>
-                      </div>
-                      {report.expandedSection === 7 ? (
-                        <ChevronUp className="h-5 w-5 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                      )}
-                    </div>
-                  </CardHeader>
-                  {report.expandedSection === 7 && (
-                    <CardContent className="space-y-4 pt-0">
-                      <p className="text-sm text-muted-foreground">
-                        Capture a photo of your F2F meeting with the client (optional)
-                      </p>
-
-                      <div className="space-y-2">
-                        <Label>F2F Meeting Photo with Client</Label>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          className="hidden"
-                          ref={fileInputRefs.clientMeeting}
-                          onChange={(e) =>
-                            handleFileUpload("clientMeeting", e.target.files?.[0] || null)
-                          }
-                        />
-                        {uploadedFiles.clientMeeting ? (
-                          <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                            <span className="text-sm truncate flex-1">
-                              {uploadedFiles.clientMeeting.name}
-                            </span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleFileUpload("clientMeeting", null)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="w-full"
-                            onClick={() => fileInputRefs.clientMeeting.current?.click()}
-                          >
-                            <Camera className="h-4 w-4 mr-2" />
-                            Take Photo
-                          </Button>
-                        )}
-                      </div>
-
-                      <Button
-                        type="button"
-                        onClick={() => markSectionComplete(report.id, 7)}
-                        className="w-full"
-                      >
-                        Continue
-                      </Button>
-                    </CardContent>
-                  )}
-                </Card>
-              </>
-            )}
-          </div>
-        ))}
-
-        {/* Add Another Report Button */}
+        {/* Add Another Project Information */}
         <Button
           type="button"
           variant="outline"
-          onClick={addNewReport}
+          onClick={addProject}
           className="w-full h-12 text-base border-dashed border-2"
         >
           <Plus className="h-5 w-5 mr-2" />
-          Add Another Field Sales Report
+          Add Another Project Information
         </Button>
 
         {/* Submit Button */}
@@ -1077,7 +1031,7 @@ export default function FieldSalesForm() {
             ) : (
               <span className="flex items-center gap-2">
                 <Send className="h-5 w-5" />
-                Submit {reports.length > 1 ? `All ${reports.length} Reports` : "Field Report"}
+                Submit Field Report
               </span>
             )}
           </Button>
