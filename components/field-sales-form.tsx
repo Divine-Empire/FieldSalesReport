@@ -37,7 +37,6 @@ const SALES_EXECUTIVES = [
   "RANJAN KUMAR PRUSTY",
   "SAMIRAN RAJBONGSHI",
   "ROSHAN DEWANGAN",
-  "MANOSH ROY",
   "AMAN JHA",
 ]
 
@@ -218,20 +217,30 @@ export default function FieldSalesForm() {
   // Form state
   const [expandedSection, setExpandedSection] = useState<number>(1)
   const [completedSections, setCompletedSections] = useState<number[]>([])
+  const [salesPerson, setSalesPerson] = useState("")
+  const [visitType, setVisitType] = useState("")
   const [companyName, setCompanyName] = useState("")
   const [contacts, setContacts] = useState<ContactEntry[]>([
     { designation: "", contactPerson: "", contactMobile: "" },
   ])
+  const [natureOfBusiness, setNatureOfBusiness] = useState("")
   const [projects, setProjects] = useState<ProjectEntry[]>([createNewProject(1)])
   const [hasEnquiry, setHasEnquiry] = useState<string>("")
+  const [productInterested, setProductInterested] = useState("")
+  const [quantityRequired, setQuantityRequired] = useState("")
+  const [expectedPurchaseTime, setExpectedPurchaseTime] = useState("")
+  const [orderProbability, setOrderProbability] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
+
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
 
   const fileInputRefs = {
     clientMeeting: useRef<HTMLInputElement>(null),
   }
 
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+  const APPSCRIPT_URL = process.env.NEXT_PUBLIC_APPSCRIPT_URL || process.env.VITE_APPSCRIPT_URL || "https://script.google.com/macros/s/AKfycbwaEwRX6RhSxlkcWjAUoacmwSVwW8uMlEf-2NBTPLaf18N3iKOYXo39PVcAiSSDCrF38Q/exec"
+  const GOOGLE_FOLDER_ID = process.env.NEXT_PUBLIC_GOOGLE_FOLDER_ID || process.env.GOOGLE_FOLDER_ID || "1-2NwO1mXzYmYPIDNUTkA4oOl3c9r8pZ8"
 
   const toggleSection = (sectionId: number) => {
     setExpandedSection(expandedSection === sectionId ? 0 : sectionId)
@@ -284,9 +293,112 @@ export default function FieldSalesForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    setIsSubmitting(false)
-    setIsSubmitted(true)
+
+    try {
+      let fileUrl = ""
+      if (uploadedFile) {
+        const reader = new FileReader()
+        const base64Promise = new Promise<string>((resolve) => {
+          reader.onload = (e) => resolve(e.target?.result as string)
+          reader.readAsDataURL(uploadedFile)
+        })
+        const base64Data = await base64Promise
+        
+        try {
+          const uploadResponse = await fetch(APPSCRIPT_URL, {
+            method: "POST",
+            body: new URLSearchParams({
+              action: "uploadFile",
+              base64Data: base64Data,
+              fileName: uploadedFile.name,
+              mimeType: uploadedFile.type,
+              folderId: GOOGLE_FOLDER_ID
+            })
+          })
+          const uploadResult = await uploadResponse.json()
+          if (uploadResult.success) {
+            fileUrl = uploadResult.fileUrl
+          }
+        } catch (uploadErr) {
+          console.error("File upload failed, proceeding without photo:", uploadErr)
+        }
+      }
+
+      // 1. Fetch Headers from Row 3
+      const getResponse = await fetch(`${APPSCRIPT_URL}?sheet=Data`)
+      const getResult = await getResponse.json()
+      if (!getResult.success) throw new Error(getResult.error)
+      
+      const headers = getResult.data[2] // Row 3 is index 2
+      
+      // Use a format that Google Sheets recognizes reliably across locales
+      const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0]
+      const visitTime = currentDateTime ? currentDateTime.toISOString().replace('T', ' ').split('.')[0] : ""
+
+      // 2. Map Data to Headers
+      const rowData = headers.map((header: string) => {
+        const h = header.trim().toLowerCase()
+        if (h === "timestamp") return timestamp
+        if (h === "sale person name") return salesPerson
+        if (h === "date and time to visit") return visitTime
+        if (h === "city/location of visit") return liveLocation
+        if (h === "type of visit") return visitType
+        if (h === "client/company name") return companyName
+        if (h === "nature of business") return natureOfBusiness
+        if (h === "did you receive any enquiry?") return hasEnquiry
+        if (h === "product interested in") return productInterested
+        if (h === "quantity required") return quantityRequired
+        if (h === "expected purchase time") return expectedPurchaseTime
+        if (h === "order probability") return orderProbability
+        if (h === "f2f meeting photo with client") return fileUrl
+
+        // Contacts Mapping
+        if (h === "designation") return contacts[0]?.designation || ""
+        if (h === "contact person name") return contacts[0]?.contactPerson || ""
+        if (h === "contact person mobile") return contacts[0]?.contactMobile || ""
+        
+        for (let i = 2; i <= 4; i++) {
+          if (h === `contact person name ${i}`) return contacts[i-1]?.contactPerson || ""
+          if (h === `contact person mobile ${i}`) return contacts[i-1]?.contactMobile || ""
+        }
+
+        // Projects Mapping
+        if (h === "project name") return projects[0]?.projectName || ""
+        if (h === "project location") return projects[0]?.projectLocation || ""
+        if (h === "nature of project") return projects[0]?.natureOfProject || ""
+        if (h === "percentage of balance work") return projects[0]?.balanceWork || ""
+        if (h === "remarks") return projects[0]?.remarks || ""
+
+        for (let i = 2; i <= 4; i++) {
+          if (h === `project name ${i}`) return projects[i-1]?.projectName || ""
+          if (h === `project location ${i}`) return projects[i-1]?.projectLocation || ""
+          if (h === `nature of project ${i}`) return projects[i-1]?.natureOfProject || ""
+          if (h === `percentage of balance work ${i}`) return projects[i-1]?.balanceWork || ""
+          if (h === `remarks ${i}`) return projects[i-1]?.remarks || ""
+        }
+
+        return ""
+      })
+
+      // 3. Submit Data
+      const postResponse = await fetch(APPSCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          action: "insert",
+          sheetName: "Data",
+          rowData: JSON.stringify(rowData)
+        })
+      })
+
+      setIsSubmitting(false)
+      setIsSubmitted(true)
+    } catch (error) {
+      console.error("Submission error:", error)
+      alert("Error submitting report. Please try again.")
+      setIsSubmitting(false)
+    }
   }
 
   if (isSubmitted) {
@@ -392,7 +504,7 @@ export default function FieldSalesForm() {
             <CardContent className="space-y-4 pt-0">
               <div className="space-y-2">
                 <Label>Sales Person Name</Label>
-                <Select>
+                <Select value={salesPerson} onValueChange={setSalesPerson}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select your name" />
                   </SelectTrigger>
@@ -471,7 +583,7 @@ export default function FieldSalesForm() {
             <CardContent className="space-y-4 pt-0">
               <div className="space-y-2">
                 <Label>Type of Visit</Label>
-                <Select>
+                <Select value={visitType} onValueChange={setVisitType}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select visit type" />
                   </SelectTrigger>
@@ -592,13 +704,14 @@ export default function FieldSalesForm() {
                 variant="outline"
                 onClick={addContact}
                 className="w-full"
+                disabled={contacts.length >= 4}
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Add Another Contact
+                Add Another Contact {contacts.length >= 4 && "(Limit reached)"}
               </Button>
               <div className="space-y-2">
                 <Label>Nature of Business</Label>
-                <Select>
+                <Select value={natureOfBusiness} onValueChange={setNatureOfBusiness}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select nature of business" />
                   </SelectTrigger>
@@ -734,6 +847,16 @@ export default function FieldSalesForm() {
               ))}
               <Button
                 type="button"
+                variant="outline"
+                onClick={addProject}
+                className="w-full"
+                disabled={projects.length >= 4}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Another Project Information {projects.length >= 4 && "(Limit reached)"}
+              </Button>
+              <Button
+                type="button"
                 onClick={() => markSectionComplete(4)}
                 className="w-full"
               >
@@ -799,15 +922,23 @@ export default function FieldSalesForm() {
                 <>
                   <div className="space-y-2">
                     <Label>Product Interested In</Label>
-                    <Input placeholder="Enter product name" />
+                    <Input 
+                      value={productInterested} 
+                      onChange={(e) => setProductInterested(e.target.value)} 
+                      placeholder="Enter product name" 
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Quantity Required</Label>
-                    <Input placeholder="Enter quantity" />
+                    <Input 
+                      value={quantityRequired} 
+                      onChange={(e) => setQuantityRequired(e.target.value)} 
+                      placeholder="Enter quantity" 
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Expected Purchase Time</Label>
-                    <Select>
+                    <Select value={expectedPurchaseTime} onValueChange={setExpectedPurchaseTime}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select expected time" />
                       </SelectTrigger>
@@ -866,7 +997,7 @@ export default function FieldSalesForm() {
             <CardContent className="space-y-4 pt-0">
               <div className="space-y-2">
                 <Label>Order Probability</Label>
-                <Select>
+                <Select value={orderProbability} onValueChange={setOrderProbability}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select probability" />
                   </SelectTrigger>
@@ -974,15 +1105,6 @@ export default function FieldSalesForm() {
         </Card>
 
         {/* Add Another Project Information */}
-        <Button
-          type="button"
-          variant="outline"
-          onClick={addProject}
-          className="w-full h-12 text-base border-dashed border-2"
-        >
-          <Plus className="h-5 w-5 mr-2" />
-          Add Another Project Information
-        </Button>
 
         {/* Submit Button */}
         <div className="pt-4 pb-8">
