@@ -291,6 +291,18 @@ export default function FieldSalesForm() {
   }
 
   const markSectionComplete = (sectionId: number) => {
+    // Validation for Section 1
+    if (sectionId === 1) {
+      if (!salesPerson) {
+        alert("Please select a Sales Person Name")
+        return
+      }
+      if (!liveLocation || liveLocation === "Detecting location..." || liveLocation === "Location unavailable" || liveLocation === "Location not supported") {
+        alert("Please wait for location to be detected or ensure location services are enabled")
+        return
+      }
+    }
+
     if (!completedSections.includes(sectionId)) {
       setCompletedSections([...completedSections, sectionId])
     }
@@ -336,6 +348,19 @@ export default function FieldSalesForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Final validation
+    if (!salesPerson) {
+      alert("Please select a Sales Person Name")
+      setExpandedSection(1)
+      return
+    }
+    if (!liveLocation || liveLocation === "Detecting location..." || liveLocation === "Location unavailable" || liveLocation === "Location not supported") {
+      alert("Location is required. Please ensure location services are enabled.")
+      setExpandedSection(1)
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
@@ -534,7 +559,7 @@ export default function FieldSalesForm() {
           {expandedSection === 1 && (
             <CardContent className="space-y-4 pt-0">
               <div className="space-y-2">
-                <Label>Sales Person Name</Label>
+                <Label>Sales Person Name <span className="text-destructive">*</span></Label>
                 <Select value={salesPerson} onValueChange={setSalesPerson}>
                   <SelectTrigger className="h-11">
                     <SelectValue placeholder="Select your name" />
@@ -558,7 +583,7 @@ export default function FieldSalesForm() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>City / Location of Visit</Label>
+                <Label>City / Location of Visit <span className="text-destructive">*</span></Label>
                 <div className="relative">
                   <Input
                     value={locationLoading ? "Detecting location..." : liveLocation}
