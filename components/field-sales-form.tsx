@@ -53,6 +53,8 @@ const DESIGNATIONS = [
   "Purchase",
   "QC",
   "Surveyor",
+  "Site Supervisor",
+  "Other",
 ]
 
 const NATURE_OF_BUSINESS = [
@@ -82,6 +84,14 @@ const BALANCE_WORK_PERCENTAGES = [
   "75%-100%",
 ]
 
+const PROJECT_VALUES = [
+  "0 – 50 Cr",
+  "50 – 100 Cr",
+  "100 – 250 Cr",
+  "250 – 500 Cr",
+  "500 Cr & Above",
+]
+
 const PURCHASE_TIMES = [
   "Immediate",
   "Within 1 Month",
@@ -92,8 +102,28 @@ const PURCHASE_TIMES = [
 
 const ORDER_PROBABILITY = ["Hot", "Warm", "Cold"]
 
+const PRODUCT_LIST = [
+  "LAB EQUIPMENT",
+  "BENDING",
+  "CUTTING",
+  "ROLLER",
+  "SRP",
+  "MINI CRANE",
+  "AUTOLEVEL",
+  "TOTAL STATION",
+  "OTHER",
+]
+
+const ENQUIRY_VALUES = [
+  "0 – 1 Lakh",
+  "1 – 3 Lakh",
+  "3 – 5 Lakh",
+  "5 Lakh & Above",
+]
+
 interface ContactEntry {
   designation: string
+  otherDesignation?: string
   contactPerson: string
   contactMobile: string
 }
@@ -104,6 +134,7 @@ interface ProjectEntry {
   projectLocation: string
   natureOfProject: string
   balanceWork: string
+  projectValue: string
   remarks: string
 }
 
@@ -126,6 +157,7 @@ function createNewProject(id: number): ProjectEntry {
     projectLocation: "",
     natureOfProject: "",
     balanceWork: "",
+    projectValue: "",
     remarks: "",
   }
 }
@@ -218,12 +250,14 @@ export default function FieldSalesForm() {
   const [visitType, setVisitType] = useState("")
   const [companyName, setCompanyName] = useState("")
   const [contacts, setContacts] = useState<ContactEntry[]>([
-    { designation: "", contactPerson: "", contactMobile: "" },
+    { designation: "", otherDesignation: "", contactPerson: "", contactMobile: "" },
   ])
   const [natureOfBusiness, setNatureOfBusiness] = useState("")
   const [projects, setProjects] = useState<ProjectEntry[]>([createNewProject(1)])
   const [hasEnquiry, setHasEnquiry] = useState<string>("")
   const [productInterested, setProductInterested] = useState("")
+  const [otherProductInterested, setOtherProductInterested] = useState("")
+  const [enquiryValue, setEnquiryValue] = useState("")
   const [quantityRequired, setQuantityRequired] = useState("")
   const [expectedPurchaseTime, setExpectedPurchaseTime] = useState("")
   const [orderProbability, setOrderProbability] = useState("")
@@ -257,6 +291,26 @@ export default function FieldSalesForm() {
   }
 
   const markSectionComplete = (sectionId: number) => {
+    // Validation for Section 1
+    if (sectionId === 1) {
+      if (!salesPerson) {
+        alert("Please select a Sales Person Name")
+        return
+      }
+      if (!liveLocation || liveLocation === "Detecting location..." || liveLocation === "Location unavailable" || liveLocation === "Location not supported") {
+        alert("Please wait for location to be detected or ensure location services are enabled")
+        return
+      }
+    }
+
+    // Validation for Section 2
+    if (sectionId === 2) {
+      if (!visitType) {
+        alert("Please select a Type of Visit")
+        return
+      }
+    }
+
     if (!completedSections.includes(sectionId)) {
       setCompletedSections([...completedSections, sectionId])
     }
@@ -267,7 +321,7 @@ export default function FieldSalesForm() {
 
   // Contact functions
   const addContact = () => {
-    setContacts([...contacts, { designation: "", contactPerson: "", contactMobile: "" }])
+    setContacts([...contacts, { designation: "", otherDesignation: "", contactPerson: "", contactMobile: "" }])
   }
 
   const removeContact = (index: number) => {
@@ -303,6 +357,17 @@ export default function FieldSalesForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    // Final validation
+    if (!salesPerson) {
+      alert("Please select a Sales Person Name")
+      setExpandedSection(1)
+      return
+    }
+    if (!liveLocation || liveLocation === "Detecting location..." || liveLocation === "Location unavailable" || liveLocation === "Location not supported") {
+      alert("Location is required. Please ensure location services are enabled.")
+      setExpandedSection(1)
+      return
+    }
     if (!visitType) {
       alert("Please select a Type of Visit in Section 2.")
       setExpandedSection(2)
@@ -355,7 +420,8 @@ export default function FieldSalesForm() {
         "client/company name": companyName,
         "nature of business": natureOfBusiness,
         "did you receive any enquiry?": hasEnquiry,
-        "product interested in": productInterested,
+        "product interested in": productInterested === "OTHER" ? otherProductInterested : productInterested,
+        "enqury value": enquiryValue,
         "quantity required": quantityRequired,
         "expected purchase time": expectedPurchaseTime,
         "order probability": orderProbability,
@@ -364,7 +430,7 @@ export default function FieldSalesForm() {
 
       // Add Contacts
       if (contacts[0]) {
-        dataObject["designation"] = contacts[0].designation || ""
+        dataObject["designation"] = contacts[0].designation === "Other" ? (contacts[0].otherDesignation || "Other") : (contacts[0].designation || "")
         dataObject["contact person name"] = contacts[0].contactPerson || ""
         dataObject["contact person mobile"] = contacts[0].contactMobile || ""
       }
@@ -380,6 +446,7 @@ export default function FieldSalesForm() {
         dataObject["project location"] = projects[0].projectLocation || ""
         dataObject["nature of project"] = projects[0].natureOfProject || ""
         dataObject["percentage of balance work"] = projects[0].balanceWork || ""
+        dataObject["project value"] = projects[0].projectValue || ""
         dataObject["remarks"] = projects[0].remarks || ""
       }
       for (let i = 2; i <= 4; i++) {
@@ -388,6 +455,7 @@ export default function FieldSalesForm() {
         dataObject[`project location ${i}`] = project?.projectLocation || ""
         dataObject[`nature of project ${i}`] = project?.natureOfProject || ""
         dataObject[`percentage of balance work ${i}`] = project?.balanceWork || ""
+        dataObject[`project value ${i}`] = project?.projectValue || ""
         dataObject[`remarks ${i}`] = project?.remarks || ""
       }
 
@@ -444,12 +512,12 @@ export default function FieldSalesForm() {
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-              <HardHat className="h-5 w-5 text-primary-foreground" />
+            <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center overflow-hidden border border-border">
+              <img src="/logo.jpeg" alt="Divine Empire Logo" className="w-full h-full object-contain" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-foreground">Field Sales Report</h1>
-              <p className="text-sm text-muted-foreground">Construction Equipment Division</p>
+              <h1 className="text-lg font-bold text-foreground">Field Sales Report</h1>
+              <p className="text-sm text-muted-foreground">Divine Empire India Pvt. Ltd</p>
             </div>
           </div>
         </div>
@@ -504,7 +572,7 @@ export default function FieldSalesForm() {
           {expandedSection === 1 && (
             <CardContent className="space-y-4 pt-0">
               <div className="space-y-2">
-                <Label>Sales Person Name</Label>
+                <Label>Sales Person Name <span className="text-destructive">*</span></Label>
                 <Select value={salesPerson} onValueChange={setSalesPerson}>
                   <SelectTrigger className="h-11">
                     <SelectValue placeholder="Select your name" />
@@ -528,7 +596,7 @@ export default function FieldSalesForm() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>City / Location of Visit</Label>
+                <Label>City / Location of Visit <span className="text-destructive">*</span></Label>
                 <div className="relative">
                   <Input
                     value={locationLoading ? "Detecting location..." : liveLocation}
@@ -646,6 +714,16 @@ export default function FieldSalesForm() {
                           ))}
                         </SelectContent>
                       </Select>
+                      {contact.designation === "Other" && (
+                        <div className="mt-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                          <Input
+                            placeholder="Type designation here..."
+                            value={contact.otherDesignation || ""}
+                            onChange={(e) => updateContact(index, "otherDesignation", e.target.value)}
+                            className="h-11"
+                          />
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label>Contact Person Name</Label>
@@ -697,13 +775,7 @@ export default function FieldSalesForm() {
 
               <Button
                 type="button"
-                onClick={() => {
-                  if (!visitType) {
-                    alert("Please select a Type of Visit before continuing.")
-                    return
-                  }
-                  markSectionComplete(2)
-                }}
+                onClick={() => markSectionComplete(2)}
                 className="w-full"
               >
                 Continue
@@ -818,6 +890,24 @@ export default function FieldSalesForm() {
                       </Select>
                     </div>
                     <div className="space-y-2">
+                      <Label>Project Value</Label>
+                      <Select
+                        value={project.projectValue}
+                        onValueChange={(val) => updateProject(project.id, "projectValue", val)}
+                      >
+                        <SelectTrigger className="h-11">
+                          <SelectValue placeholder="Select project value" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PROJECT_VALUES.map((val) => (
+                            <SelectItem key={val} value={val}>
+                              {val}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
                       <Label>Remarks</Label>
                       <Textarea
                         value={project.remarks}
@@ -867,13 +957,44 @@ export default function FieldSalesForm() {
                 {hasEnquiry === "yes" && (
                   <>
                     <div className="space-y-2">
-                      <Label>Product Interested In</Label>
-                      <Input 
-                        value={productInterested} 
-                        onChange={(e) => setProductInterested(e.target.value)} 
-                        placeholder="Enter product name" 
-                        className="h-11"
-                      />
+                      <Label>Product Interested</Label>
+                      <Select value={productInterested} onValueChange={setProductInterested}>
+                        <SelectTrigger className="h-11">
+                          <SelectValue placeholder="Select product" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PRODUCT_LIST.map((product) => (
+                            <SelectItem key={product} value={product}>
+                              {product}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {productInterested === "OTHER" && (
+                        <div className="mt-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                          <Input
+                            placeholder="Type product name here..."
+                            value={otherProductInterested}
+                            onChange={(e) => setOtherProductInterested(e.target.value)}
+                            className="h-11"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Enquiry Value</Label>
+                      <Select value={enquiryValue} onValueChange={setEnquiryValue}>
+                        <SelectTrigger className="h-11">
+                          <SelectValue placeholder="Select enquiry value" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ENQUIRY_VALUES.map((val) => (
+                            <SelectItem key={val} value={val}>
+                              {val}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label>Quantity Required</Label>

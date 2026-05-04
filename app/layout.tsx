@@ -21,7 +21,7 @@ export const metadata: Metadata = {
         media: '(prefers-color-scheme: dark)',
       },
       {
-        url: '/icon.svg',
+        url: '/divine-logo.svg',
         type: 'image/svg+xml',
       },
     ],
