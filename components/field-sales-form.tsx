@@ -302,6 +302,13 @@ export default function FieldSalesForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!visitType) {
+      alert("Please select a Type of Visit in Section 2.")
+      setExpandedSection(2)
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
@@ -578,7 +585,9 @@ export default function FieldSalesForm() {
               {/* Visit Type Fields (Old Section 2) */}
               <div className="space-y-4 pb-4 border-b border-border">
                 <div className="space-y-2">
-                  <Label>Type of Visit</Label>
+                  <Label className="flex items-center gap-1">
+                    Type of Visit <span className="text-destructive">*</span>
+                  </Label>
                   <Select value={visitType} onValueChange={setVisitType}>
                     <SelectTrigger className="h-11">
                       <SelectValue placeholder="Select visit type" />
@@ -688,7 +697,13 @@ export default function FieldSalesForm() {
 
               <Button
                 type="button"
-                onClick={() => markSectionComplete(2)}
+                onClick={() => {
+                  if (!visitType) {
+                    alert("Please select a Type of Visit before continuing.")
+                    return
+                  }
+                  markSectionComplete(2)
+                }}
                 className="w-full"
               >
                 Continue
