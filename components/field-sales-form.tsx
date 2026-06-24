@@ -33,13 +33,7 @@ import {
   Upload,
 } from "lucide-react"
 
-const SALES_EXECUTIVES = [
-  "PRANAV VINAYAKRAO BHOGAWAR",
-  "RANJAN KUMAR PRUSTY",
-  "SAMIRAN RAJBONGSHI",
-  "YASH AGRAWAL",
-  "AMAN JHA",
-]
+
 
 const VISIT_TYPES = [
   "New F2F",
@@ -285,6 +279,47 @@ export default function FieldSalesForm() {
 
   const APPSCRIPT_URL = process.env.NEXT_PUBLIC_APPSCRIPT_URL || process.env.VITE_APPSCRIPT_URL || "https://script.google.com/macros/s/AKfycbwaEwRX6RhSxlkcWjAUoacmwSVwW8uMlEf-2NBTPLaf18N3iKOYXo39PVcAiSSDCrF38Q/exec"
   const GOOGLE_FOLDER_ID = process.env.NEXT_PUBLIC_GOOGLE_FOLDER_ID || process.env.GOOGLE_FOLDER_ID || "1-2NwO1mXzYmYPIDNUTkA4oOl3c9r8pZ8"
+
+  const [salesExecutives, setSalesExecutives] = useState<string[]>([])
+  const [loadingExecutives, setLoadingExecutives] = useState<boolean>(true)
+
+  useEffect(() => {
+    const fetchExecutives = async () => {
+      try {
+        setLoadingExecutives(true)
+        const response = await fetch(`${APPSCRIPT_URL}?sheet=Master Data`)
+        if (!response.ok) throw new Error("Failed to fetch Master Data")
+        const res = await response.json()
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          const headers = res.data[0]
+          // Find Column B or header with 'Sales Person Name'
+          let colIndex = 1 // Default to Column B (index 1)
+          const targetHeader = "sales person name"
+          const foundIndex = headers.findIndex(
+            (h: any) => h && h.toString().trim().toLowerCase() === targetHeader
+          )
+          if (foundIndex !== -1) {
+            colIndex = foundIndex
+          }
+          
+          const executivesList: string[] = []
+          for (let r = 1; r < res.data.length; r++) {
+            const val = res.data[r][colIndex]
+            if (val && val.toString().trim() !== "") {
+              executivesList.push(val.toString().trim())
+            }
+          }
+          setSalesExecutives(executivesList)
+        }
+      } catch (err) {
+        console.error("Error loading sales executives:", err)
+      } finally {
+        setLoadingExecutives(false)
+      }
+    }
+
+    fetchExecutives()
+  }, [APPSCRIPT_URL])
 
   const toggleSection = (sectionId: number) => {
     setExpandedSection(expandedSection === sectionId ? 0 : sectionId)
@@ -573,12 +608,12 @@ export default function FieldSalesForm() {
             <CardContent className="space-y-4 pt-0">
               <div className="space-y-2">
                 <Label>Sales Person Name <span className="text-destructive">*</span></Label>
-                <Select value={salesPerson} onValueChange={setSalesPerson}>
+                <Select value={salesPerson} onValueChange={setSalesPerson} disabled={loadingExecutives}>
                   <SelectTrigger className="h-11">
-                    <SelectValue placeholder="Select your name" />
+                    <SelectValue placeholder={loadingExecutives ? "Loading names..." : "Select your name"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {SALES_EXECUTIVES.map((name) => (
+                    {salesExecutives.map((name) => (
                       <SelectItem key={name} value={name}>
                         {name}
                       </SelectItem>
