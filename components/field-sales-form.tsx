@@ -32,6 +32,8 @@ import {
   Trash2,
   Upload,
 } from "lucide-react"
+import { supabase } from "@/lib/supabase"
+import { compressImage } from "@/lib/image-compressor"
 
 
 
@@ -61,16 +63,6 @@ const NATURE_OF_BUSINESS = [
   "Road",
 ]
 
-const NATURE_OF_PROJECT = [
-  "Bridge",
-  "Building",
-  "Industrial Civil",
-  "Mines",
-  "Rail",
-  "Road",
-  "Other",
-]
-
 const BALANCE_WORK_PERCENTAGES = [
   "0%-25%",
   "25%-50%",
@@ -95,18 +87,6 @@ const PURCHASE_TIMES = [
 ]
 
 const ORDER_PROBABILITY = ["Hot", "Warm", "Cold"]
-
-const PRODUCT_LIST = [
-  "LAB EQUIPMENT",
-  "BENDING",
-  "CUTTING",
-  "ROLLER",
-  "SRP",
-  "MINI CRANE",
-  "AUTOLEVEL",
-  "TOTAL STATION",
-  "OTHER",
-]
 
 const ENQUIRY_VALUES = [
   "0 – 1 Lakh",
@@ -160,6 +140,11 @@ export default function FieldSalesForm() {
   const [currentDateTime, setCurrentDateTime] = useState<Date | null>(null)
   const [liveLocation, setLiveLocation] = useState<string>("")
   const [locationLoading, setLocationLoading] = useState<boolean>(true)
+  const [coordinates, setCoordinates] = useState<{ latitude: number | null; longitude: number | null }>({
+    latitude: null,
+    longitude: null,
+  })
+  const [submittedSerialCode, setSubmittedSerialCode] = useState<string>("")
 
   useEffect(() => {
     setCurrentDateTime(new Date())
@@ -210,6 +195,7 @@ export default function FieldSalesForm() {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords
+          setCoordinates({ latitude, longitude })
           fetchLocationName(latitude, longitude)
         },
         (error) => {
@@ -277,49 +263,71 @@ export default function FieldSalesForm() {
     clientMeeting: useRef<HTMLInputElement>(null),
   }
 
-  const APPSCRIPT_URL = process.env.NEXT_PUBLIC_APPSCRIPT_URL || process.env.VITE_APPSCRIPT_URL || "https://script.google.com/macros/s/AKfycbwaEwRX6RhSxlkcWjAUoacmwSVwW8uMlEf-2NBTPLaf18N3iKOYXo39PVcAiSSDCrF38Q/exec"
-  const GOOGLE_FOLDER_ID = process.env.NEXT_PUBLIC_GOOGLE_FOLDER_ID || process.env.GOOGLE_FOLDER_ID || "1-2NwO1mXzYmYPIDNUTkA4oOl3c9r8pZ8"
-
   const [salesExecutives, setSalesExecutives] = useState<string[]>([])
-  const [loadingExecutives, setLoadingExecutives] = useState<boolean>(true)
+  const [visitTypes, setVisitTypes] = useState<string[]>(VISIT_TYPES)
+  const [designationList, setDesignationList] = useState<string[]>(DESIGNATIONS)
+  const [natureOfBusinessList, setNatureOfBusinessList] = useState<string[]>(NATURE_OF_BUSINESS)
+  const [natureOfProjectList, setNatureOfProjectList] = useState<string[]>([])
+  const [productList, setProductList] = useState<string[]>([])
+  const [loadingDropdowns, setLoadingDropdowns] = useState<boolean>(true)
 
   useEffect(() => {
-    const fetchExecutives = async () => {
+    const fetchDropdowns = async () => {
       try {
-        setLoadingExecutives(true)
-        const response = await fetch(`${APPSCRIPT_URL}?sheet=Master Data`)
-        if (!response.ok) throw new Error("Failed to fetch Master Data")
-        const res = await response.json()
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-          const headers = res.data[0]
-          // Find Column B or header with 'Sales Person Name'
-          let colIndex = 1 // Default to Column B (index 1)
-          const targetHeader = "sales person name"
-          const foundIndex = headers.findIndex(
-            (h: any) => h && h.toString().trim().toLowerCase() === targetHeader
-          )
-          if (foundIndex !== -1) {
-            colIndex = foundIndex
-          }
-          
-          const executivesList: string[] = []
-          for (let r = 1; r < res.data.length; r++) {
-            const val = res.data[r][colIndex]
-            if (val && val.toString().trim() !== "") {
-              executivesList.push(val.toString().trim())
-            }
-          }
-          setSalesExecutives(executivesList)
+        setLoadingDropdowns(true)
+        const { data, error } = await supabase
+          .from("lto_dropdown")
+          .select("category, value")
+          .in("category", [
+            "fos_sales_person_name",
+            "fos_type_of_visit",
+            "fos_designation",
+            "fos_nature_of_business",
+            "fos_nature_of_project",
+            "fos_product_interested",
+          ])
+          .order("created_at", { ascending: true })
+
+        if (error) {
+          console.error("Error loading dropdowns from Supabase:", error)
+          return
+        }
+
+        if (data && data.length > 0) {
+          const salesNames: string[] = []
+          const visits: string[] = []
+          const desigs: string[] = []
+          const businesses: string[] = []
+          const projectNatures: string[] = []
+          const products: string[] = []
+
+          data.forEach((item) => {
+            const val = item.value?.trim()
+            if (!val) return
+            if (item.category === "fos_sales_person_name") salesNames.push(val)
+            else if (item.category === "fos_type_of_visit") visits.push(val)
+            else if (item.category === "fos_designation") desigs.push(val)
+            else if (item.category === "fos_nature_of_business") businesses.push(val)
+            else if (item.category === "fos_nature_of_project") projectNatures.push(val)
+            else if (item.category === "fos_product_interested") products.push(val)
+          })
+
+          if (salesNames.length > 0) setSalesExecutives(salesNames)
+          if (visits.length > 0) setVisitTypes(visits)
+          if (desigs.length > 0) setDesignationList(desigs)
+          if (businesses.length > 0) setNatureOfBusinessList(businesses)
+          if (projectNatures.length > 0) setNatureOfProjectList(projectNatures)
+          if (products.length > 0) setProductList(products)
         }
       } catch (err) {
-        console.error("Error loading sales executives:", err)
+        console.error("Error loading dropdowns from Supabase:", err)
       } finally {
-        setLoadingExecutives(false)
+        setLoadingDropdowns(false)
       }
     }
 
-    fetchExecutives()
-  }, [APPSCRIPT_URL])
+    fetchDropdowns()
+  }, [])
 
   const toggleSection = (sectionId: number) => {
     setExpandedSection(expandedSection === sectionId ? 0 : sectionId)
@@ -414,103 +422,109 @@ export default function FieldSalesForm() {
     try {
       let fileUrl = ""
       if (uploadedFile) {
-        const reader = new FileReader()
-        const base64Promise = new Promise<string>((resolve) => {
-          reader.onload = (e) => resolve(e.target?.result as string)
-          reader.readAsDataURL(uploadedFile)
-        })
-        const base64Data = await base64Promise
-        
         try {
-          const uploadResponse = await fetch(APPSCRIPT_URL, {
-            method: "POST",
-            body: new URLSearchParams({
-              action: "uploadFile",
-              base64Data: base64Data,
-              fileName: uploadedFile.name,
-              mimeType: uploadedFile.type,
-              folderId: GOOGLE_FOLDER_ID
+          // 1. Client-side Image Compression (Reduces 10MB to <400KB in milliseconds)
+          const compressedFile = await compressImage(uploadedFile)
+          const fileExt = compressedFile.name.split(".").pop() || "jpg"
+          const cleanFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`
+          const storagePath = `f2f_photos/${cleanFileName}`
+
+          // 2. Upload to Supabase Storage Bucket: field_sales_attachments
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from("field_sales_attachments")
+            .upload(storagePath, compressedFile, {
+              cacheControl: "3600",
+              upsert: false,
             })
-          })
-          const uploadResult = await uploadResponse.json()
-          if (uploadResult.success) {
-            fileUrl = uploadResult.fileUrl
+
+          if (uploadError) {
+            throw uploadError
+          } else if (uploadData) {
+            const { data: publicUrlData } = supabase.storage
+              .from("field_sales_attachments")
+              .getPublicUrl(uploadData.path)
+            fileUrl = publicUrlData.publicUrl
           }
         } catch (uploadErr) {
-          console.error("File upload failed, proceeding without photo:", uploadErr)
+          console.error("Image compression or upload error:", uploadErr)
+          const proceed = window.confirm(
+            "Photo upload failed. Submit the report without the photo?\n\nOK = submit without photo, Cancel = stay and retry."
+          )
+          if (!proceed) {
+            setIsSubmitting(false)
+            return
+          }
         }
       }
 
-      // Use a format that Google Sheets recognizes reliably across locales
-      const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0]
-      const visitTime = currentDateTime ? currentDateTime.toISOString().replace('T', ' ').split('.')[0] : ""
+      // Local (device) time, same DD/MM/YYYY hh:mm:ss format shown in the form
+      const visitTime = formatDateTime(currentDateTime)
 
-      // 1. Build Data Object (Keys match Spreadsheet headers in lowercase)
-      const dataObject: Record<string, any> = {
-        "timestamp": timestamp,
-        "sale person name": salesPerson,
-        "date and time to visit": visitTime,
-        "city/location of visit": liveLocation,
-        "type of visit": visitType,
-        "client/company name": companyName,
-        "nature of business": natureOfBusiness,
-        "did you receive any enquiry?": hasEnquiry,
-        "product interested in": productInterested === "OTHER" ? otherProductInterested : productInterested,
-        "enqury value": enquiryValue,
-        "quantity required": quantityRequired,
-        "expected purchase time": expectedPurchaseTime,
-        "order probability": orderProbability,
-        "f2f meeting photo with client": fileUrl
-      }
-
-      // Add Contacts
-      if (contacts[0]) {
-        dataObject["designation"] = contacts[0].designation === "Other" ? (contacts[0].otherDesignation || "Other") : (contacts[0].designation || "")
-        dataObject["contact person name"] = contacts[0].contactPerson || ""
-        dataObject["contact person mobile"] = contacts[0].contactMobile || ""
-      }
-      for (let i = 2; i <= 4; i++) {
-        const contact = contacts[i - 1]
-        dataObject[`contact person name ${i}`] = contact?.contactPerson || ""
-        dataObject[`contact person mobile ${i}`] = contact?.contactMobile || ""
+      // 3. Prepare Payload for Atomic Multi-Table Insertion
+      const formPayload = {
+        sales_person_name: salesPerson,
+        visit_datetime: visitTime,
+        city_location: liveLocation,
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+        visit_type: visitType,
+        company_name: companyName,
+        nature_of_business: natureOfBusiness,
+        has_enquiry: hasEnquiry ? hasEnquiry.charAt(0).toUpperCase() + hasEnquiry.slice(1) : "",
+        product_interested: productInterested === "OTHER" ? otherProductInterested : productInterested,
+        quantity_required: quantityRequired,
+        enquiry_value: enquiryValue,
+        expected_purchase_time: expectedPurchaseTime,
+        order_probability: orderProbability,
+        f2f_meeting_photo_url: fileUrl,
       }
 
-      // Add Projects
-      if (projects[0]) {
-        dataObject["project name"] = projects[0].projectName || ""
-        dataObject["project location"] = projects[0].projectLocation || ""
-        dataObject["nature of project"] = projects[0].natureOfProject || ""
-        dataObject["percentage of balance work"] = projects[0].balanceWork || ""
-        dataObject["project value"] = projects[0].projectValue || ""
-        dataObject["remarks"] = projects[0].remarks || ""
-      }
-      for (let i = 2; i <= 4; i++) {
-        const project = projects[i - 1]
-        dataObject[`project name ${i}`] = project?.projectName || ""
-        dataObject[`project location ${i}`] = project?.projectLocation || ""
-        dataObject[`nature of project ${i}`] = project?.natureOfProject || ""
-        dataObject[`percentage of balance work ${i}`] = project?.balanceWork || ""
-        dataObject[`project value ${i}`] = project?.projectValue || ""
-        dataObject[`remarks ${i}`] = project?.remarks || ""
+      const contactsPayload = contacts
+        .filter((c) => c.contactPerson || c.contactMobile || c.designation)
+        .map((c) => ({
+          designation: c.designation === "Other" ? (c.otherDesignation || "Other") : (c.designation || ""),
+          other_designation: c.otherDesignation || "",
+          contact_person_name: c.contactPerson || "",
+          contact_person_mobile: c.contactMobile || "",
+        }))
+
+      const projectsPayload = projects
+        .filter((p) => p.projectName || p.projectLocation || p.remarks)
+        .map((p) => ({
+          project_name: p.projectName || "",
+          project_location: p.projectLocation || "",
+          nature_of_project: p.natureOfProject || "",
+          percentage_balance_work: p.balanceWork || "",
+          project_value: p.projectValue || "",
+          remarks: p.remarks || "",
+        }))
+
+      // 4. Atomic Database Transaction via Stored Procedure
+      const { data: rpcResult, error: rpcError } = await supabase.rpc(
+        "submit_field_sales_report",
+        {
+          form_payload: formPayload,
+          contacts_payload: contactsPayload,
+          projects_payload: projectsPayload,
+        }
+      )
+
+      if (rpcError) {
+        console.error("Supabase RPC error:", rpcError)
+        alert(`Error submitting report: ${rpcError.message || "Unknown error"}`)
+        setIsSubmitting(false)
+        return
       }
 
-      // 2. Submit Data
-      const postResponse = await fetch(APPSCRIPT_URL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          action: "insert",
-          sheetName: "Data",
-          rowData: JSON.stringify(dataObject)
-        })
-      })
+      if (rpcResult && rpcResult.serial_code) {
+        setSubmittedSerialCode(rpcResult.serial_code)
+      }
 
       setIsSubmitting(false)
       setIsSubmitted(true)
-    } catch (error) {
+    } catch (error: any) {
       console.error("Submission error:", error)
-      alert("Error submitting report. Please try again.")
+      alert(`Error submitting report: ${error?.message || "Please try again."}`)
       setIsSubmitting(false)
     }
   }
@@ -526,15 +540,25 @@ export default function FieldSalesForm() {
             <h2 className="text-2xl font-semibold text-foreground mb-2">
               Report Submitted!
             </h2>
+            {submittedSerialCode && (
+              <div className="my-4 p-3 bg-primary/5 border border-primary/20 rounded-lg inline-block">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
+                  Report Reference Code
+                </span>
+                <span className="text-2xl font-mono font-bold text-primary">
+                  {submittedSerialCode}
+                </span>
+              </div>
+            )}
             <p className="text-muted-foreground mb-6">
-              Your field visit report has been successfully recorded.
+              Your field visit report has been successfully recorded in the system.
             </p>
-              <Button
-                onClick={() => window.location.reload()}
-                className="w-full h-12 text-base"
-              >
-                Submit Another Report
-              </Button>
+            <Button
+              onClick={() => window.location.reload()}
+              className="w-full h-12 text-base"
+            >
+              Submit Another Report
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -608,9 +632,9 @@ export default function FieldSalesForm() {
             <CardContent className="space-y-4 pt-0">
               <div className="space-y-2">
                 <Label>Sales Person Name <span className="text-destructive">*</span></Label>
-                <Select value={salesPerson} onValueChange={setSalesPerson} disabled={loadingExecutives}>
+                <Select value={salesPerson} onValueChange={setSalesPerson} disabled={loadingDropdowns}>
                   <SelectTrigger className="h-11">
-                    <SelectValue placeholder={loadingExecutives ? "Loading names..." : "Select your name"} />
+                    <SelectValue placeholder={loadingDropdowns ? "Loading names..." : "Select your name"} />
                   </SelectTrigger>
                   <SelectContent>
                     {salesExecutives.map((name) => (
@@ -696,7 +720,7 @@ export default function FieldSalesForm() {
                       <SelectValue placeholder="Select visit type" />
                     </SelectTrigger>
                     <SelectContent>
-                      {VISIT_TYPES.map((type) => (
+                      {visitTypes.map((type) => (
                         <SelectItem key={type} value={type}>
                           {type}
                         </SelectItem>
@@ -742,7 +766,7 @@ export default function FieldSalesForm() {
                           <SelectValue placeholder="Select designation" />
                         </SelectTrigger>
                         <SelectContent>
-                          {DESIGNATIONS.map((d) => (
+                          {designationList.map((d) => (
                             <SelectItem key={d} value={d}>
                               {d}
                             </SelectItem>
@@ -798,7 +822,7 @@ export default function FieldSalesForm() {
                       <SelectValue placeholder="Select nature of business" />
                     </SelectTrigger>
                     <SelectContent>
-                      {NATURE_OF_BUSINESS.map((type) => (
+                      {natureOfBusinessList.map((type) => (
                         <SelectItem key={type} value={type}>
                           {type}
                         </SelectItem>
@@ -898,7 +922,7 @@ export default function FieldSalesForm() {
                           <SelectValue placeholder="Select nature of project" />
                         </SelectTrigger>
                         <SelectContent>
-                          {NATURE_OF_PROJECT.map((type) => (
+                          {natureOfProjectList.map((type) => (
                             <SelectItem key={type} value={type}>
                               {type}
                             </SelectItem>
@@ -998,7 +1022,7 @@ export default function FieldSalesForm() {
                           <SelectValue placeholder="Select product" />
                         </SelectTrigger>
                         <SelectContent>
-                          {PRODUCT_LIST.map((product) => (
+                          {productList.map((product) => (
                             <SelectItem key={product} value={product}>
                               {product}
                             </SelectItem>
