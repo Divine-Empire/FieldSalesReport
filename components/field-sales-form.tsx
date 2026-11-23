@@ -38,9 +38,10 @@ import { compressImage } from "@/lib/image-compressor"
 
 
 const VISIT_TYPES = [
-  "New F2F",
-  "Existing F2F",
-  "MDO F2F",
+  "New F2F Assign By MDO",
+  "Existing Client Assign By MDO",
+  "Existing Client",
+  "NBD Client",
 ]
 
 const DESIGNATIONS = [
@@ -229,6 +230,7 @@ export default function FieldSalesForm() {
   const [salesPerson, setSalesPerson] = useState("")
   const [visitType, setVisitType] = useState("")
   const [companyName, setCompanyName] = useState("")
+  const [assignedCompanies, setAssignedCompanies] = useState<string[]>([])
   const [contacts, setContacts] = useState<ContactEntry[]>([
     { designation: "", otherDesignation: "", contactPerson: "", contactMobile: "" },
   ])
@@ -328,6 +330,20 @@ export default function FieldSalesForm() {
 
     fetchDropdowns()
   }, [])
+
+  // When salesPerson changes, fetch their open assigned companies for the combo dropdown
+  useEffect(() => {
+    if (!salesPerson) { setAssignedCompanies([]); return }
+    supabase
+      .from("lto_assigned_to_field_person")
+      .select("company_name")
+      .eq("status", "Open")
+      .contains("assigned_to", [salesPerson])
+      .then(({ data }) => {
+        const names = [...new Set((data || []).map((r: { company_name: string }) => r.company_name).filter(Boolean))]
+        setAssignedCompanies(names)
+      })
+  }, [salesPerson])
 
   const toggleSection = (sectionId: number) => {
     setExpandedSection(expandedSection === sectionId ? 0 : sectionId)
@@ -518,6 +534,16 @@ export default function FieldSalesForm() {
 
       if (rpcResult && rpcResult.serial_code) {
         setSubmittedSerialCode(rpcResult.serial_code)
+      }
+
+      // Auto-close the open assignment if company matches one assigned to this salesperson
+      if (salesPerson && companyName && assignedCompanies.includes(companyName)) {
+        await supabase
+          .from("lto_assigned_to_field_person")
+          .update({ status: "Closed", updated_at: new Date().toISOString() })
+          .eq("status", "Open")
+          .eq("company_name", companyName)
+          .contains("assigned_to", [salesPerson])
       }
 
       setIsSubmitting(false)
@@ -734,12 +760,24 @@ export default function FieldSalesForm() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Client / Company Name</Label>
-                  <Input
+                  {/* Combo: shows assigned open companies as suggestions, allows free-text too */}
+                  <input
+                    list="assigned-companies-list"
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
-                    placeholder="Enter company name"
-                    className="h-11"
+                    placeholder={assignedCompanies.length > 0 ? "Select assigned company or type new" : "Enter company name"}
+                    className="h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   />
+                  <datalist id="assigned-companies-list">
+                    {assignedCompanies.map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
+                  {assignedCompanies.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {assignedCompanies.length} assigned {assignedCompanies.length === 1 ? "company" : "companies"} available
+                    </p>
+                  )}
                 </div>
                 {contacts.map((contact, index) => (
                   <div key={index} className="space-y-3 p-3 border border-border rounded-lg relative">
